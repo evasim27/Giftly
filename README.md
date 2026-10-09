@@ -1,69 +1,66 @@
 # Giftly
 
-Giftly is a private gift planner built with Next.js App Router, TypeScript, Tailwind CSS, shadcn-style UI components, Lucide icons, Supabase Auth/PostgreSQL, and npm. Users can organize people, events, gifts, and EUR budgets, then create revocable read-only public links.
+Giftly is a web application for planning thoughtful gifts in one place. It helps you remember the people you care about, keep gift ideas organized, prepare for upcoming occasions, and stay within a budget. Your planning data belongs to your account. When you want to show someone a list, you can create a read-only link for a person, an event, or your whole gift collection.
 
-## Local setup
+## Functionality
 
-Requires Node.js 20.9+ and a Supabase project.
+- **Accounts:** Email/password registration, email confirmation, login, logout, password reset, persistent sessions, and an editable display name.
+- **People and occasions:** Create, edit, and delete people and events. Adding a person's birthday creates an annual event automatically; changing or clearing the birthday updates or removes that event.
+- **Gifts:** Create, edit, and delete gift ideas; assign them to a person and/or event; record description, estimated and actual prices, product URL, and idea/planned/purchased/gifted status.
+- **Images:** Optionally upload a JPG, PNG, or WebP image (up to 5 MB) or paste a direct HTTPS image URL. Gifts without images use built-in visual placeholders.
+- **Budgets and overview:** Set person and event budgets, see spending and remaining amounts, and view dashboard statistics, recent gifts, and upcoming occasions. Amounts are shown in EUR.
+- **Finding gifts:** Search by gift name, filter by status, person, or event, and sort by date, name, or estimated price.
+- **Sharing:** Generate a public read-only link for all gifts, one event's gifts, or one person's gifts. Owners can revoke links. Public lists show only approved gift details, not private budgets or actual prices.
 
-1. Install dependencies: `npm ci`
-2. Copy `.env.example` to `.env.local` and fill in the values from **Supabase → Connect → API keys**:
+## Tech stack
 
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
-   NEXT_PUBLIC_SITE_URL=http://localhost:3000
-   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-   ```
+| Area | Technology |
+| --- | --- |
+| Web application | Next.js 16 App Router, React 19, TypeScript |
+| Styling and interface | Tailwind CSS 4, local shadcn-style components, Lucide React icons, Instrument Serif, Manrope |
+| Authentication | Supabase Auth with `@supabase/ssr` |
+| Database and files | Supabase PostgreSQL with Row Level Security, private Supabase Storage |
+| Input validation | Zod |
+| Package manager and hosting | npm, Vercel |
 
-   The publishable key is used in the browser. `SUPABASE_SERVICE_ROLE_KEY` is server-only and signs uploaded images for public shared lists after token validation. Never put it in a `NEXT_PUBLIC_` variable or commit `.env.local`.
+## 1. Get the project
 
-3. Run the SQL files in `supabase/migrations/` in filename order in the Supabase SQL Editor. Apply each migration once. The first creates the schema and RLS policies; the second adds recurring birthday events and person-specific sharing; **`202610080003_gift_images.sql`** adds optional image columns, a private Storage bucket, and owner-only Storage policies. For an existing project that already has the first two migrations, run only the third file. No separate Storage dashboard setup is needed. For a Supabase CLI workflow, link your project and run `supabase db push` instead.
-4. Under **Authentication → Providers → Email**, enable email/password and **Confirm email**.
-5. Under **Authentication → URL Configuration**, set the Site URL to `http://localhost:3000` and allow `http://localhost:3000/auth/callback` as a redirect URL. Add your production callback URL when deploying.
-6. Under **Authentication → Email Templates**, update the links in **Confirm signup** and **Reset password** to support server-side verification:
+You need Node.js **22 or newer**, npm, Git, and a Supabase account. A GitHub account and Vercel account are needed only if you want to collaborate or deploy. Clone your copy of the repository (or download its source archive), then install the locked dependencies:
 
-   ```html
-   <!-- Confirm signup -->
-   <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email">Confirm your email</a>
+```bash
+git clone https://github.com/YOUR_USERNAME/YOUR_GIFTLY_REPOSITORY.git
+cd YOUR_GIFTLY_REPOSITORY
+npm ci
+```
 
-   <!-- Reset password -->
-   <a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery">Reset your password</a>
-   ```
+The repository URL and folder name above are placeholders for your own copy. Continue with the Supabase setup, create `.env.local`, then start the app.
 
-   Giftly supplies a `RedirectTo` URL containing a `next` query parameter. The `/auth/callback` route exchanges the token hash for a cookie-backed session. Keep those template links intact for both local and production URLs.
-7. Start the app with `npm run dev` and open `http://localhost:3000`.
 
-## Commands
+## 2. Local development
 
-- `npm run dev` — development server
-- `npm run lint` — ESLint
-- `npm run typecheck` — TypeScript check
-- `npm run build` — production build
-- `npm run start` — serve the production build
+Copy `.env.example` to `.env.local` (`cp .env.example .env.local` on macOS/Linux or `Copy-Item .env.example .env.local` in PowerShell). Replace the example values with your Supabase project settings:
 
-## Data and security
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_YOUR_SERVER_KEY
+```
 
-All private tables have Row Level Security. Every app mutation checks the authenticated user, validates input with Zod, and scopes updates/deletes to that user's ID. Database triggers reject cross-owner gift and sharing assignments. Sessions are refreshed in the Next.js proxy and protected pages check the user again on the server.
+Despite the existing variable name, `SUPABASE_SERVICE_ROLE_KEY` can hold Supabase's newer secret key or a legacy service role key. It is needed to display private uploaded images on public shared lists and is never sent to the browser. `.env.local` is ignored by Git.
 
-Adding a birthday to a person automatically creates a linked annual event. The Events page and dashboard show its next occurrence, including February 29 birthdays on February 28 in non-leap years. Change the person's name or birthday to update the event; clear the birthday to remove it. Gifts tied to a removed birthday event remain saved but lose that event assignment. The birthday event's budget and description remain editable.
+```bash
+npm run dev
+```
 
-Share URLs contain a cryptographically random 256-bit token. Only its SHA-256 hash is stored. Owners can share all gifts, a single event's gifts, or gifts assigned to one person. The public page uses a narrowly scoped RPC that returns gift name, description, estimated price, product URL, and status, plus event title/date when applicable. A person-specific list has a generic public title and does not reveal the person's name or profile. Event titles, including linked birthday event titles, are visible when that event is shared. Budgets and actual prices stay private. A link is displayed only when created; create a new one if you lose it. Owners can revoke links from **Shared lists**.
+Open `http://localhost:3000`, register an account, and follow the confirmation link sent by Supabase. Log in, add a person or occasion, then save a gift. The app uses your Supabase project as its database; there is no separate local database to start.
 
-Spent totals count purchased and gifted items, using actual price when present and estimated price otherwise. Planned commitment counts all gifts except ideas with the same price fallback. Budgets show the amount remaining, including a negative balance when over budget.
+Before merging or deploying changes, run:
 
-## Gift images
-
-Run `supabase/migrations/202610080003_gift_images.sql` in the Supabase SQL Editor before using images. It is safe whether or not the older `supabase/optional/gift_image_url.sql` was applied; do **not** run that older optional file afterward. The migration creates the private `gift-images` bucket with a 5 MB limit and JPG, PNG, and WebP restrictions. Users upload directly to their own folder through authenticated Supabase Storage requests. The server checks image contents before attaching an upload to a gift. Existing gifts remain unchanged and use the built-in illustrations.
-
-Add `SUPABASE_SERVICE_ROLE_KEY` to `.env.local` and Vercel's server environment variables. The key is never sent to the browser. Public shared lists validate their share token first, then issue five-minute signed URLs for private uploaded images. Revoking a link stops new signed URLs; URLs issued before revocation can remain usable until they expire. Shared-list pages send `Cache-Control: private, no-store`. External image URLs must use HTTPS and fall back to an illustration if loading fails.
-
-## GitHub collaboration
-
-Commit source files, `package-lock.json`, and the SQL migration. `.env.local`, `.next`, and `node_modules` are ignored. Invite collaborators to the GitHub repository; each collaborator creates their own `.env.local` using shared project settings through a secure channel. Work in feature branches, open pull requests, and run lint, typecheck, and build before merging. Coordinate schema changes as new numbered migrations rather than editing a migration already applied to a shared database.
-
-## Vercel deployment
-
-Import the GitHub repository into Vercel as a Next.js project. Add the same environment variables there, setting `NEXT_PUBLIC_SITE_URL` to the final `https://...` origin and keeping `SUPABASE_SERVICE_ROLE_KEY` server-only. Apply all three SQL migrations to a new production Supabase project, or only the third to a project that already has the first two. Add `https://your-domain/auth/callback` to Supabase's allowed redirect URLs; set the production Site URL as appropriate. The standard build command is `npm run build`. Redeploy after changing environment variables.
-
-Before inviting users, verify signup confirmation, login/logout, password reset, CRUD, RLS with two test users, public list access, and revocation against your configured Supabase project.
+```bash
+npm run lint
+npm run typecheck
+npm run build
+node --experimental-strip-types tests/budget.test.mjs
+node --experimental-strip-types tests/gift-images.test.mjs
+```
